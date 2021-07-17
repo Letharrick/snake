@@ -4,6 +4,7 @@ use bracket_terminal::prelude::{
     RGB
 };
 
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 
@@ -61,77 +62,39 @@ impl Snake {
                 let neck_1 = self[2];
                 let neck_0 = self.get_mut(1).unwrap();
 
-                if neck_1.position.y != neck_0.position.y {
-                    if head.position.x > neck_0.position.x {
-                        neck_0.glyph = if neck_1.position.y > neck_0.position.y {
-                            Self::CORNER_GLYPHS.0
-                        } else {
-                            Self::CORNER_GLYPHS.2
-                        }
-                    } else if head.position.x < neck_0.position.x {
-                        neck_0.glyph = if neck_1.position.y > neck_0.position.y {
-                            Self::CORNER_GLYPHS.1
-                        } else {
-                            Self::CORNER_GLYPHS.3
-                        }
-                    }
-                } else if neck_1.position.x != neck_0.position.x {
-                    if head.position.y > neck_0.position.y {
-                        neck_0.glyph = if neck_1.position.x > neck_0.position.x {
+                 if neck_1.position.x != neck_0.position.x {
+                    match head.position.y.cmp(&neck_0.position.y) {
+                        Ordering::Greater => neck_0.glyph = if neck_1.position.x > neck_0.position.x {
                             Self::CORNER_GLYPHS.0
                         } else {
                             Self::CORNER_GLYPHS.1
-                        }
-                    } else if head.position.y < neck_0.position.y{
-                        neck_0.glyph = if neck_1.position.x > neck_0.position.x {
+                        },
+                        Ordering::Less => neck_0.glyph = if neck_1.position.x > neck_0.position.x {
                             Self::CORNER_GLYPHS.2
                         } else {
                             Self::CORNER_GLYPHS.3
-                        }
-                    }
+                        },
+                        _ => {}
+                    };
+                } else if neck_1.position.y != neck_0.position.y {
+                    match head.position.x.cmp(&neck_0.position.x) {
+                        Ordering::Greater => neck_0.glyph = if neck_1.position.y > neck_0.position.y {
+                            Self::CORNER_GLYPHS.0
+                        } else {
+                            Self::CORNER_GLYPHS.2
+                        },
+                        Ordering::Less => neck_0.glyph = if neck_1.position.y > neck_0.position.y {
+                            Self::CORNER_GLYPHS.1
+                        } else {
+                            Self::CORNER_GLYPHS.3
+                        },
+                        _ => {}
+                    };
                 }
 
                 self.requires_corner_update = false;
             }
         }
-    }
-}
-
-impl Default for Snake {
-    fn default() -> Self {
-        let spawn_point =  Point::from((
-            Game::MAP_CENTRE.0 as i32,
-            Game::MAP_CENTRE.1 as i32
-        ));
-        
-        let body_segment = Object::new(spawn_point, Self::HORIZONTAL_GLYPH, Self::COLOUR);
-        let mut body = VecDeque::from(vec![body_segment; Self::STARTING_LENGTH - 1]);
-        
-        let mut head = body_segment;
-        head.position = head.position + Into::<Point>::into(Self::STARTING_DIRECTIN);
-        body.push_front(head);
-
-        Self {
-            body,
-            direction: Self::STARTING_DIRECTIN,
-            popped_tail: None,
-            requires_corner_update: false,
-            alive: true
-        }
-    }
-}
-
-impl Deref for Snake {
-    type Target = VecDeque<Object>;
-
-    fn deref(&self) -> &Self::Target {
-       &self.body
-    }
-}
-
-impl DerefMut for Snake {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-       &mut self.body
     }
 }
 
@@ -149,7 +112,7 @@ impl Obj for Snake {
             let out_of_bounds = 
                 head.position.x < 0 || head.position.x >= Game::MAP_DIMENSIONS.0 as i32 ||
                 head.position.y < 0 || head.position.y >= Game::MAP_DIMENSIONS.1 as i32;
-            let self_collision = self.range(1..).map(|seg| seg.position).collect::<Vec<Point>>().contains(&head.position);
+            let self_collision = self.range(1..).map(|seg| seg.position).any(|point| point == head.position);
 
             self.alive = !self_collision && !out_of_bounds;
 
@@ -175,10 +138,44 @@ impl Obj for Snake {
             self.update_corner_glyphs();
         } else {
             self.pop_front();
-
-            if self.is_empty() {
-                drop(self);
-            }
         }
+    }
+}
+
+impl Default for Snake {
+    fn default() -> Self {
+        let spawn_point =  Point::from((
+            Game::MAP_CENTRE.0 as i32,
+            Game::MAP_CENTRE.1 as i32
+        ));
+
+        let body_segment = Object::new(spawn_point, Self::HORIZONTAL_GLYPH, Self::COLOUR);
+        let mut body = VecDeque::from(vec![body_segment; Self::STARTING_LENGTH - 1]);
+
+        let mut head = body_segment;
+        head.position = head.position + Into::<Point>::into(Self::STARTING_DIRECTIN);
+        body.push_front(head);
+
+        Self {
+            body,
+            direction: Self::STARTING_DIRECTIN,
+            popped_tail: None,
+            requires_corner_update: false,
+            alive: true
+        }
+    }
+}
+
+impl Deref for Snake {
+    type Target = VecDeque<Object>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.body
+    }
+}
+
+impl DerefMut for Snake {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.body
     }
 }
